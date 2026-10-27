@@ -5,8 +5,8 @@ Stages 0–10 are the core, ordered by dependency, not by month. Stage 10 is the
 | # | Stage | Scope | Done when | Status |
 |---|---|---|---|---|
 | 0 | Market: how a battery earns | market primer + 3 ADRs | `docs/market-primer.md` and ADR 0001–0003 in repo | done |
-| 1 | Repo skeleton and working rules | layout, uv, ruff, pytest, short README, STATUS.md, ADR template, CLI with empty commands | `bess --help` works, lint and tests pass | next |
-| 2 | Source inventory | per source: coverage, resolution, history, publication time, licence, pitfalls; WDB rules; competitor landscape | `docs/data-sources.md` complete; open questions resolved or recorded | todo |
+| 1 | Repo skeleton and working rules | layout, uv, ruff, pytest, short README, STATUS.md, ADR template, CLI with empty commands | `bess --help` works, lint and tests pass | done |
+| 2 | Source inventory | per source: coverage, resolution, history, publication time, licence, pitfalls; WDB rules; competitor landscape | `docs/data-sources.md` complete; open questions resolved or recorded | next |
 | 3 | Ingest and raw snapshots | ENTSO-E, PSE, Open-Meteo Single Runs; immutable raw with download time; backfill from 06.2024; daily 10:30 snapshot | one command downloads full history; rerun adds no duplicates | todo |
 | 4 | Data layer (dbt-duckdb) | UTC, 15-min grid, units; one optimiser input table; tests for gaps, duplicates and DST | complete grid from 06.2024, tests pass | todo |
 | 5 | Optimiser v1: day-ahead | LP: SoC, efficiency, cycle limit; day by day with SoC carry-over and end-of-day energy value; MILP only if needed | tests on hand-computed cases; results make sense by eye | todo |

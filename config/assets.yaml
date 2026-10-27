@@ -1,0 +1,19 @@
+# Reference assets (ADR-0001). Energy is usable MWh; SoC is a share of usable energy.
+# Charge and discharge efficiency are each sqrt(round_trip_efficiency), derived in code.
+assets:
+  bess_2h:
+    power_mw: 1.0
+    energy_mwh: 2.0
+    round_trip_efficiency: 0.86
+    soc_min: 0.0
+    soc_max: 1.0
+    max_cycles_per_day: 1.5
+    degradation_cost_pln_per_mwh: 0.0  # base case; non-zero only as a sensitivity
+  bess_4h:
+    power_mw: 1.0
+    energy_mwh: 4.0
+    round_trip_efficiency: 0.86
+    soc_min: 0.0
+    soc_max: 1.0
+    max_cycles_per_day: 1.5
+    degradation_cost_pln_per_mwh: 0.0

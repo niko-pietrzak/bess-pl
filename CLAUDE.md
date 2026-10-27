@@ -31,7 +31,13 @@ Open monthly revenue index for a 1 MW battery (2h and 4h) in Poland. Two numbers
 Python + uv, ruff, pytest, Parquet + DuckDB, dbt-duckdb, CLI `bess`. Local first; cloud only when needed.
 
 ## Commands
-Added in stage 1.
+```sh
+uv sync                    # install / update the environment
+uv run bess --help         # CLI entry point
+uv run ruff check .        # lint
+uv run ruff format .       # format
+uv run pytest              # tests
+```
 
 ## Layout
 ```

@@ -1,10 +1,14 @@
-
 # project
 data/
+.env
+.env.*
 CLAUDE.local.md
-.DS_Store
 
-# project
-data/
-CLAUDE.local.md
+# python
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+
+# os
 .DS_Store
