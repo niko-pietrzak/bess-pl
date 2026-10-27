@@ -24,7 +24,7 @@ Stage 0 knowledge, as of 10.2026. Figures are dated; check the source before reu
 | FCR | availability | ~197 MW; hourly blocks |
 | Day-ahead (RDN) | spread | 15-min products; solar trough at noon, peak in the evening |
 | mFRR / RR | capacity and energy | slower; per LCP, mFRR is converging towards aFRR; not modelled by Modo |
-| Intraday (RDB) | position adjustments | deferred until the TGE data licence is clear |
+| Intraday (RDB) | position adjustments | deferred to stage 11; TGE data terms in ADR-0005 |
 | Capacity market | multi-year contract | derating for storage falls fast, see below |
 | Imbalance (CEN) | settlement of deviations | a risk, not revenue; PSE penalises deliberate imbalance |
 
@@ -34,19 +34,20 @@ Modo benchmark, 4h: July 2026 1.67 m PLN/MW/year (aFRR 67%, day-ahead 24%, FCR 8
 - FCR: the battery measures frequency itself and responds proportionally; full power at a 200 mHz deviation within 30 s.
 - aFRR: a setpoint from the PSE controller every few seconds; full activation within 5 min. mFRR takes ~12–15 min, RR ~30 min.
 - Nothing happens on its own after grid connection. A battery needs an EMS, a link to PSE, a balancing service provider (DUB) and PSE prequalification per product and direction, which takes months.
-- Operating-point rule: reserve is counted from current operation, and an idle battery must pick one direction. Only one direction of operation per 15-min period. To be confirmed in WDB (stage 2).
+- Operating-point rule: reserve is counted from current operation, and an idle battery must pick one direction. Only one direction of operation per 15-min period. WDB 8.6.5 defines storage unit states; to be confirmed in stage 6.
 - First battery prequalified by PSE: Nowe Czarnowo I. First independent DUB after the reform: Ekovoltis.
 
 ## Order of decisions (optimiser skeleton)
-1. D-1 morning: balancing capacity auction, basic mode, before day-ahead.
-2. D-1 12:00: day-ahead market in 15-min products.
-3. After day-ahead: supplementary balancing capacity auction; intraday until 1 h before delivery.
+1. D-1 08:30–09:00: balancing capacity auction (RMB), basic mode, hourly; results by 10:00.
+2. D-1 12:00: day-ahead market (SDAC) in 15-min products.
+3. D-1 10:00–14:30 and later: supplementary mode in ZPG (not in v1); intraday until 1 h before delivery.
+Times and sources: ADR-0006.
 4. Day D: aFRR activations via PICASSO; imbalance settled at CEN every 15 min.
 
 ## Data breakpoints
 - 14.06.2024: balancing market reform; PSE reports available in the API from this day.
 - 11.07.2025: PSE joins PICASSO.
-- Autumn 2025: day-ahead moves to 15-min products (exact date: stage 2).
+- 1.10.2025 (delivery day): day-ahead moves to 15-min products (ADR-0006).
 - 1.02.2027: unit schedules in 15 min.
 
 ## Saturation, 2h vs 4h, after 2030
@@ -79,6 +80,8 @@ June 2026 annualised: PolBESS ~2.3 m PLN/MW, Modo 1.84 m PLN/MW.
 Optimisers active in Poland: Entrix (>1.5 GW, the largest), Axpo (≥510 MW), Capalo AI, Ekovoltis with enspired, Respect Energy, Suena, Tesla Autobidder.
 
 ## Glossary
+Polish balancing terms follow WDB sections 2.2–2.3 (abbreviations and definitions).
+
 | Term | Meaning |
 |---|---|
 | ADR | Architecture Decision Record, one short file per decision |
@@ -88,21 +91,34 @@ Optimisers active in Poland: Entrix (>1.5 GW, the largest), Axpo (≥510 MW), Ca
 | CFADS / DSCR | cash flow available for debt service / debt service coverage ratio |
 | D-1 | the day before delivery |
 | DST | daylight saving time change |
-| DUB | balancing service provider (Dostawca Usług Bilansujących) |
+| DUB / BSP | balancing service provider (dostawca usług bilansujących) |
 | EMS | energy management system, the battery controller |
 | FCR | frequency containment reserve |
 | GBM | gradient boosting model (e.g. LightGBM) |
+| GCT | gate closure time: the last moment to submit or change bids |
+| JG / JGM1 | scheduling unit (jednostka grafikowa): set of delivery points through which a BSP provides balancing services; JGM1 = storage scheduling unit with ZAK = 1 (jednostka grafikowa magazynu), fully dispatchable by PSE |
 | KWD | capacity market derating factor (korekcyjny współczynnik dyspozycyjności) |
 | LP / MILP | linear programming / mixed-integer linear programming |
 | mFRR / RR | manual frequency restoration reserve / replacement reserve |
 | NFOŚiGW | National Fund for Environmental Protection and Water Management |
+| OEB | balancing energy bid (oferta na energię bilansującą): price offer to deliver or take balancing energy, part of the ZPG bid |
+| OMB | balancing capacity bid (oferta na moce bilansujące): price offer for balancing capacity, part of the ZPG bid, per scheduling unit |
+| ONMBP / ONMBU | balancing capacity procurement period (okres nabywania mocy bilansujących) in basic / supplementary mode; hour / 15 min |
+| OPMB | portfolio balancing capacity bid (oferta portfolio na moce bilansujące): submitted by a BSP without naming the scheduling units that will deliver |
+| OREB | balancing energy settlement period (okres rozliczania energii bilansującej): 15 min |
 | P10 / P50 / P90 | value exceeded in 90% / 50% / 10% of cases |
 | PICASSO | European platform for aFRR balancing energy |
+| PP | operating programme (program pracy): load schedule and reserve schedules submitted by a BSP for a scheduling unit |
 | PSE | Polish transmission system operator |
+| RBN / RBB | day-ahead / intraday balancing market (rynek bilansujący dnia następnego / bieżącego): PSE submission windows for PP, OEB, OMB |
 | RDN / RDB | day-ahead / intraday market |
+| RMB | balancing capacity market (rynek mocy bilansujących): PSE procurement of balancing capacity in basic mode, D-1 |
+| SDAC | single day-ahead coupling: the EU day-ahead auction |
 | SoC | state of charge |
 | TGE | Polish Power Exchange |
 | WDB | PSE balancing market rules (Warunki Dotyczące Bilansowania) |
+| ZAK | activity flag (znacznik aktywności): how far PSE may dispatch a scheduling unit |
+| ZPG | integrated scheduling process (zintegrowany proces grafikowania): iterative PSE process that selects units, balancing capacity (supplementary mode) and energy |
 
 ## Sources
 TODO: add links.

@@ -1,6 +1,7 @@
 # ADR-0003: Scope of v1 and the realistic variant
 
 Status: accepted · 2026-10-25
+Amended by ADR-0006: reserve capacity from basic mode (RMB) only; reserve information cutoff 08:30 D-1.
 
 ## Context
 Modo models day-ahead, FCR and aFRR. Reserve capacity is sold in the D-1 morning auction, before the day-ahead market, and reserves give ~75–80% of revenue in 2026 (Modo).

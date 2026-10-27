@@ -1,13 +1,15 @@
-# Status · 2026-10-27
+# Status · 2026-10-28
 
-Stage 1 done. Next: stage 2 (source inventory).
+Stage 2 done. Next: stage 3 (ingest and raw snapshots).
 
 Done
-- Stage 0: ADR-0001 to 0003, market primer, roadmap.
-- Stage 1: ADR-0004 tooling (uv, ruff, pytest, Python 3.12, Typer); skeleton per CLAUDE.md layout; `config/assets.yaml`; CLI `bess` with empty `ingest` and `run`; smoke test; ADR template; README.
+- Stages 0–1: ADR-0001 to 0004, primer, roadmap, repo skeleton, CLI.
+- Stage 2: ADR-0005 data sources, ADR-0006 gate closures (from WDB), ADR-0003 amended; `docs/data-sources.md` with a role per dataset; glossary extended.
 
 Next
-1. Stage 2: `docs/data-sources.md`; settle gate closure of each market (ADR-0003 depends on it).
+1. Stage 3, first the daily 08:30 and 10:30 snapshots: every day without them loses forecast versions for good. Then backfill.
+2. At the start of stage 3: Q5 (PL reserves on ENTSO-E) with the ENTSO-E token from `.env`.
+3. Before publication #1: owner of PL day-ahead prices (O2a); questions to TGE (ADR-0005) and PSE (Q4, raporty.pse.pl terms), sent together.
 
 Notes
-- January fallback: post "Three indices, three answers" needs only stage 2.
+- PSE `publication_ts` is the last revision time: own snapshots are the only proof of what was known at the cutoff.
