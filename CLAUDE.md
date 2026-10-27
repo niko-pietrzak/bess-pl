@@ -7,11 +7,10 @@ Open monthly revenue index for a 1 MW battery (2h and 4h) in Poland. Two numbers
 2. Read the ADRs in `docs/decisions/` that touch the task. `docs/market-primer.md` explains how a battery earns money in Poland and has the glossary.
 
 ## How we work
-- Talk to me in Polish. Code, docs, ADRs and commit messages in English (public repo).
-- Act as a co-founder: correct and criticise when it matters, not for its own sake. Be concise: the point first, depth on request.
-- Every stage starts with "what and why" as an ADR (5–10 lines: context, decision, consequences). Code only after I accept the plan. Understanding matters more than speed.
+- Code, docs, ADRs and commit messages in English.
+- Every stage starts with "what and why" as an ADR (5–10 lines: context, decision, consequences). Code only after the plan is accepted. Understanding matters more than speed.
 - Expand every abbreviation on first use.
-- I have 5–7 h a week. Prefer the smallest solution that meets the stage's "done when".
+- Prefer the smallest solution that meets the stage's "done when".
 
 ## Repo rules
 1. One job per document. README never exceeds one screen and is not a changelog.
