@@ -7,7 +7,7 @@ Stages 0–10 are the core, ordered by dependency, not by month. Stage 10 is the
 | 0 | Market: how a battery earns | market primer + 3 ADRs | `docs/market-primer.md` and ADR 0001–0003 in repo | done |
 | 1 | Repo skeleton and working rules | layout, uv, ruff, pytest, short README, STATUS.md, ADR template, CLI with empty commands | `bess --help` works, lint and tests pass | done |
 | 2 | Source inventory | per source: coverage, resolution, history, publication time, licence, pitfalls; WDB rules; competitor landscape | `docs/data-sources.md` complete; open questions resolved or recorded | done |
-| 3 | Ingest and raw snapshots | ENTSO-E, PSE, Open-Meteo Single Runs; immutable raw with download time; backfill from 06.2024; daily 08:30 and 10:30 snapshots | one command downloads full history; rerun adds no duplicates | next |
+| 3 | Ingest and raw snapshots | ENTSO-E, PSE, Open-Meteo Single Runs; immutable raw with download time; daily snapshots before the 08:30 and 11:00 cutoffs with RFC 3161 time stamps; backfill from 06.2024; measured publication times | snapshots run in the cloud 7 days in a row without intervention, alert tested; backfill idempotent with a gap report; `bess status` shows last, late and missing snapshots | in progress |
 | 4 | Data layer (dbt-duckdb) | UTC, 15-min grid, units; one optimiser input table; tests for gaps, duplicates and DST | complete grid from 06.2024, tests pass | todo |
 | 5 | Optimiser v1: day-ahead | LP: SoC, efficiency, cycle limit; day by day with SoC carry-over and end-of-day energy value; MILP only if needed | tests on hand-computed cases; results make sense by eye | todo |
 | 6 | Optimiser v2: FCR and aFRR | joint optimisation; operating-point rule; energy headroom; activations in 3 variants (A typical level as Modo, B proportional, C none); CEN not as revenue | revenue split by market; order of magnitude matches benchmarks or is explained | todo |
@@ -40,11 +40,22 @@ Architecture from day one: the asset is a swappable module (battery, PV + batter
 - Does the PSE API return a publication time per record? Needed to apply cutoffs to history without snapshots. Partly answered: `publication_ts` exists but is the last revision time (`docs/data-sources.md`).
 - Does PSE publish volumes and prices of supplementary-mode capacity? Endpoints exist (`cmbu-tu`, `mbu-tu`); check content and coverage.
 - Do sources overwrite data after publication (forecast and price revisions), and does the API expose versions? If not, history may contain information from after the cutoff.
-- Where do the 08:30 and 10:30 snapshots run without a laptop switched on? Decide in an ADR; live evidence as a file hash in the public repo, never the data itself.
+- Where do the snapshots run without a laptop switched on? ADR-0007. Evidence: RFC 3161 tokens on each slot manifest, stored with the data; a public evidence repo waits for stage 9.
+- After 28.03.2027: a short repeat of the publication-time measurement in summer time. Sources on UTC schedules (ECMWF, Open-Meteo) then appear one hour later in local time; PSE works in local time.
 
 ## Open questions for stage 6
+- Realistic variant: bids at opportunity cost or fixed volumes? Confirm in WDB (balancing rules) that the RMB marginal price is set per hour, product and direction.
 - Operating-point rule for storage units (JGM1 states, WDB 8.6.5; O5 in ADR-0006).
 - Under marginal pricing a small player's best capacity bid is its opportunity cost (forgone day-ahead arbitrage). The realistic variant then depends mainly on a day-ahead price forecast, not a reserve price forecast.
 
 ## Open questions for stage 7
+- Naive forecast = day-ahead prices of the last known day. ADR: after weekends and holidays, take the same weekday one week earlier instead?
+- Capture rate split by market.
+- The methodology states the simplifications of v1: no intraday, no supplementary mode, a fixed plan.
 - PSE settlement data is revised long after the fact (`crb-rozl` for 14.06.2024 revised on 16.09.2025), so the index for recent months can change. The methodology must state the data vintage of every publication and the rule for recalculation.
+
+## Open questions for stage 10
+- The price model takes the cutoff as a parameter: 11:00 D-1 for day-ahead, 08:30 D-1 for reserve bids. Data availability is checked separately for each cutoff.
+- Foreign features: weather in DE, CZ and LT; ENTSO-E transfer capacities and flows (11.1.A, 11.1.B, 12.1.G).
+- Is the 00 UTC ECMWF run available before 08:30 local in summer (06:30 UTC)? 08:30 is our conservative convention; bids are accepted until 09:00. If not, the reserve cutoff uses the 18 UTC run of D-2. Snapshots and the publication-time measurement (stage 3) answer this.
+- PSE `pk5l-wp` and PKD (`pdgopkd`, `pdgobpkd`): wind, PV and demand forecasts of the TSO. `pk5l-wp` is available before both cutoffs; PKD for D appears around 16:00 on D-1, after them.
