@@ -20,6 +20,7 @@ from pathlib import Path
 import certifi
 
 from bess.ingest.datasets import WARSAW, Request, requests_for
+from bess.ingest.timestamp import REQUIRED, Stamp, stamp
 
 # Information cutoffs per slot, local time on D-1 (ADR-0006). `poll` has no cutoff (O6).
 CUTOFFS = {"reserves": time(8, 30), "dayahead": time(11, 0), "poll": None}
@@ -148,8 +149,13 @@ def run_slot(
     sleep: Callable[[float], None] = time_module.sleep,
     requests: list[Request] | None = None,
     log: Callable[[str], None] = print,
+    stamper: Callable[[bytes], list[Stamp]] | None = None,
 ) -> Report:
     """Download every request of one slot into snapshots/<run_date>/<slot>/<run_id>/.
+
+    Then write `_manifest.json` (SHA-256 of every file of the run) and, for cutoff slots,
+    time-stamp it with two independent TSAs (RFC 3161). The run is valid for its cutoff
+    only if both tokens are dated before the cutoff; otherwise it is kept and reported late.
 
     Retries go in rounds: each round tries every pending call once, then waits with
     exponential backoff, until the deadline (cutoff minus SAFETY). One dead endpoint
@@ -165,11 +171,16 @@ def run_slot(
     run_dir = f"snapshots/{run_date}/{slot}/{started:%Y%m%dT%H%M%SZ}"
     report = Report(slot, run_dir)
     version = _code_version()
+    written: dict[str, tuple[str, int]] = {}
+
+    def put(name: str, data: bytes) -> None:
+        store.put(f"{run_dir}/{name}", data)
+        written[name] = (hashlib.sha256(data).hexdigest(), len(data))
 
     def save(item: _Item, r: Response, finished: datetime) -> None:
         req = item.req
         suffix = f"__p{item.page}" if item.page > 1 else ""
-        key = f"{run_dir}/{_name(req)}{suffix}"
+        key = f"{_name(req)}{suffix}"
         ext = _extension(r.headers.get("content-type", ""))
         meta = {
             "source": req.source,
@@ -193,8 +204,8 @@ def run_slot(
             "attempts": item.attempts,
             "code_version": version,
         }
-        store.put(f"{key}.{ext}", r.body)
-        store.put(f"{key}.meta.json", json.dumps(meta, indent=1).encode())
+        put(f"{key}.{ext}", r.body)
+        put(f"{key}.meta.json", json.dumps(meta, indent=1).encode())
         report.files += 1
 
     pending: list[_Item] = []
@@ -248,12 +259,74 @@ def run_slot(
         "other_failures": report.other_failures,
         "code_version": version,
     }
-    store.put(f"{run_dir}/_run.json", json.dumps(summary, indent=1).encode())
+    put("_run.json", json.dumps(summary, indent=1).encode())
+
+    manifest = {
+        "slot": slot,
+        "run_date": str(run_date),
+        "run_dir": run_dir,
+        "cutoff_utc": _iso(cutoff) if cutoff else None,
+        "created_utc": _iso(now()),
+        "files": [
+            {"path": name, "sha256": digest, "size": size}
+            for name, (digest, size) in sorted(written.items())
+        ],
+    }
+    manifest_bytes = json.dumps(manifest, indent=1).encode()
+    store.put(f"{run_dir}/_manifest.json", manifest_bytes)
+    if cutoff:
+        _seal(report, store, manifest_bytes, cutoff, stamper or (lambda d: stamp(d, opener)), log)
     log(
         f"{slot} {run_date}: {report.files} files, "
         f"{len(report.critical_failures)} critical and {len(report.other_failures)} other failures"
     )
     return report
+
+
+def _seal(
+    report: Report,
+    store: LocalStore,
+    manifest: bytes,
+    cutoff: datetime,
+    stamper: Callable[[bytes], list[Stamp]],
+    log: Callable[[str], None],
+) -> None:
+    """Time-stamp the manifest; store tokens and chains next to it; judge validity."""
+    stamps = stamper(manifest)
+    for s in stamps:
+        if s.tsr:
+            store.put(f"{report.run_dir}/_manifest.{s.tsa}.tsr", s.tsr)
+        if s.chain_pem:
+            store.put(f"{report.run_dir}/_manifest.{s.tsa}.chain.pem", s.chain_pem.encode())
+    granted = [s for s in stamps if s.ok][:REQUIRED]
+    latest = max((s.gen_time for s in granted), default=None)
+    valid = len(granted) == REQUIRED and latest < cutoff
+    summary = {
+        "cutoff_utc": _iso(cutoff),
+        "valid_for_cutoff": valid,
+        "stamps": [
+            {
+                "tsa": s.tsa,
+                "url": s.url,
+                "ok": s.ok,
+                "error": s.error,
+                "gen_time_utc": _iso(s.gen_time) if s.gen_time else None,
+                "before_cutoff": (s.gen_time < cutoff) if s.gen_time else None,
+            }
+            for s in stamps
+        ],
+    }
+    store.put(f"{report.run_dir}/_tsa.json", json.dumps(summary, indent=1).encode())
+    if len(granted) < REQUIRED:
+        errors = "; ".join(f"{s.tsa}: {s.error}" for s in stamps if not s.ok)
+        message = f"time stamp: {len(granted)} of {REQUIRED} tokens ({errors})"
+    elif not valid:
+        message = f"late: time stamp {_iso(latest)} not before cutoff {_iso(cutoff)}"
+    else:
+        log(f"sealed: {', '.join(s.tsa for s in granted)} at {_iso(latest)}")
+        return
+    report.critical_failures.append(message)
+    log(f"CRITICAL {message}")
 
 
 def _name(req: Request) -> str:

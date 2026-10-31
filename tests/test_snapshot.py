@@ -10,6 +10,7 @@ import pytest
 
 from bess.ingest.datasets import Request, local_day_start_utc, requests_for
 from bess.ingest.snapshot import LocalStore, Report, cutoff_utc, ping, run_slot
+from bess.ingest.timestamp import Stamp
 
 TOKEN = "s3cr3t-token-value"
 
@@ -67,7 +68,25 @@ def recorder(sent):
     return opener
 
 
-def run(tmp_path, responses, requests, start, slot="reserves", token=TOKEN):
+def stamper_at(clock, granted=2):
+    def stamper(data):
+        return [
+            Stamp(
+                name,
+                "http://tsa",
+                i < granted,
+                None if i < granted else "down",
+                clock.now(),
+                b"tsr",
+                "pem",
+            )
+            for i, name in enumerate(["a", "b"])
+        ]
+
+    return stamper
+
+
+def run(tmp_path, responses, requests, start, slot="reserves", token=TOKEN, granted=2):
     clock = FakeClock(start)
     opener = opener_from(responses)
     report = run_slot(
@@ -79,6 +98,7 @@ def run(tmp_path, responses, requests, start, slot="reserves", token=TOKEN):
         sleep=clock.sleep,
         requests=requests,
         log=lambda _: None,
+        stamper=stamper_at(clock, granted),
     )
     return report, opener
 
@@ -235,7 +255,40 @@ def test_dead_endpoint_does_not_starve_others(tmp_path):
         sleep=clock.sleep,
         requests=[dead, PSE_REQ],
         log=lambda _: None,
+        stamper=stamper_at(clock),
     )
     assert report.critical_failures == ["pse/dead: URLError: <urlopen error down>"]
     assert len(flaky_calls) == 4
     assert {m["dataset"]: m["http_status"] for m in metas(tmp_path)} == {"dead": None, "zmb": 200}
+
+
+def test_manifest_lists_every_file_and_is_sealed(tmp_path):
+    report, _ = run(tmp_path, [FakeResponse(200, b"{}")], [PSE_REQ], MORNING)
+    run_dir = tmp_path / report.run_dir
+    manifest = json.loads((run_dir / "_manifest.json").read_text())
+    listed = {f["path"]: f["sha256"] for f in manifest["files"]}
+    assert set(listed) == {"pse/zmb.json", "pse/zmb.meta.json", "_run.json"}
+    for path, digest in listed.items():
+        assert hashlib.sha256((run_dir / path).read_bytes()).hexdigest() == digest
+    assert (run_dir / "_manifest.a.tsr").exists() and (run_dir / "_manifest.b.chain.pem").exists()
+    assert json.loads((run_dir / "_tsa.json").read_text())["valid_for_cutoff"] is True
+
+
+def test_late_time_stamp_is_critical(tmp_path):
+    late = datetime(2026, 11, 2, 8, 0, tzinfo=UTC)
+    report, _ = run(tmp_path, [FakeResponse(200, b"{}")], [PSE_REQ], late)
+    assert report.critical_failures[-1].startswith("late: time stamp 2026-11-02T08:00")
+    tsa = json.loads((tmp_path / report.run_dir / "_tsa.json").read_text())
+    assert tsa["valid_for_cutoff"] is False
+
+
+def test_one_token_is_not_enough(tmp_path):
+    report, _ = run(tmp_path, [FakeResponse(200, b"{}")], [PSE_REQ], MORNING, granted=1)
+    assert report.critical_failures == ["time stamp: 1 of 2 tokens (b: down)"]
+
+
+def test_poll_has_manifest_without_time_stamp(tmp_path):
+    report, _ = run(tmp_path, [FakeResponse(200, b"{}")], [PSE_REQ], MORNING, slot="poll")
+    assert report.ok
+    assert (tmp_path / report.run_dir / "_manifest.json").exists()
+    assert not (tmp_path / report.run_dir / "_tsa.json").exists()
